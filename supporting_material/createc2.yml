@@ -1,0 +1,103 @@
+Parameters:
+  newlyVPC:
+      Description: VPC used to deploy our resources below
+      Type: AWS::EC2::VPC::Id
+  pubNet:
+      Description: Subnet to be used for our Web Server
+      Type: AWS::EC2::Subnet::Id
+  AMItoUse:
+      Description: AMI to use for our base image
+      Type: String
+
+
+Description: >
+  Shola Akanni Bluefish / Udalearn
+  This deploys a VPC
+
+Resources:
+  FirstEc2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: ami-0cff7528ff583bf9a
+      Tags:
+      - Key: name
+        Value: myfirsttestec2
+      - Key: Type
+        Value: Test Instance
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: "0"
+          GroupSet: 
+            - Ref: "instanceSecurityGroup"
+          SubnetId: 
+            Ref: "pubNet"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install -y httpd
+          sudo systemctl start httpd
+          sudo systemctl enable httpd
+
+  instanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref newlyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: '*'
+          ToPort: '*'
+          CidrIp: 0.0.0.0/0
+
+  VPCcreate:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: name
+          Value: newlyVPC
+
+  subnet1Create:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AssignIpv6AddressOnCreation: false
+      AvailabilityZones: us-east-1a
+      AvailabilityZoneId: use2-az3
+      CidrBlock: 10.0.0.0/20
+      MapPublicIpOnLaunch: 'true'
+      Tags: 
+        - Tag
+      VpcId: !Ref newlyVPC
+
+  subnet2Create:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AssignIpv6AddressOnCreation: 'false'
+      AvailabilityZones: us-east-1b
+      AvailabilityZoneId: use2-az2	
+      CidrBlock: 10.0.16.0/20
+      MapPublicIpOnLaunch: 'true'
+      Tags: 
+        - Tag
+      VpcId: !Ref newlyVPC
+
+  subnet3Create:
+    Type: AWS::EC2::Subnet
+    Properties: 
+      AssignIpv6AddressOnCreation: 'false'
+      AvailabilityZones: us-east-1c
+      AvailabilityZoneId: use2-az3
+      CidrBlock: 10.0.16.0/20
+      MapPublicIpOnLaunch: 'true'
+      Tags: 
+        - Tag
+      VpcId: !Ref newlyVPC
