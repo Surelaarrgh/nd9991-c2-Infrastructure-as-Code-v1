@@ -5,6 +5,9 @@ Description: "Launch Configuration
   two vCPUs and at least 4GB
   Ubuntu 18
   12GB of disk space."
+
+#ami-074f9ee1243ba4362-ubuntu
+
 Parameters:
   KeyName:
     Description: udakey
@@ -13,6 +16,7 @@ Parameters:
     MaxLength: "64"
     AllowedPattern: "[-_ a-zA-Z0-9]*"
     ConstraintDescription: can contain only alphanumeric characters, spaces, dashes and underscores.
+    
   SSHLocation:
     Description: Lockdown SSH access to the bastion host (default can be accessed
       from anywhere)
@@ -22,37 +26,27 @@ Parameters:
     Default: 0.0.0.0/0
     AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
     ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x.
-  FrontendInstanceType:
-    Description: Frontend Server EC2 instance type
+
+  servInstanceType:
+    Description:  Server EC2 instance type
     Type: String
-    Default: t2.micro
+    Default: t2.medium
     AllowedValues:
-      - t2.micro
+      - t2.medium
+    ConstraintDescription: must be a t2.medium.
   
-    ConstraintDescription: must be a valid EC2 instance type.
-  FrontendSize:
+  servSize:
     Description: Number of EC2 instances to launch for the Frontend server
     Type: Number
-    Default: "1"
-  BackendInstanceType:
-    Description: Backend Server EC2 instance type
-    Type: String
-    Default: m1.small
-    AllowedValues:
-      - t2.micro
-
-    ConstraintDescription: must be a valid EC2 instance type.
-  BackendSize:
-    Description: Number of EC2 instances to launch for the backend server
-    Type: Number
     Default: "2"
+
+
   BastionInstanceType:
     Description: Bastion Host EC2 instance type
     Type: String
-    Default: t2.micro
+    Default: t2.medium
     AllowedValues:
-      - t2.micro
-  
+      - t2.medium
     ConstraintDescription: must be a valid EC2 instance type.
 
  
@@ -63,6 +57,7 @@ Mappings:
       CIDR: 12.0.0.0/24
     Private:
       CIDR: 12.0.1.0/24
+      CIDR2: 12.0.1.0/24
 
 
 Resources:
@@ -152,24 +147,11 @@ Resources:
         From: 80
         To: 80
 
-  InboundHTTPSPublicNetworkAclEntry:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref PublicNetworkAcl
-      RuleNumber: 101
-      Protocol: 6
-      RuleAction: allow
-      Egress: false
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 443
-        To: 443
-
   InboundSSHPublicNetworkAclEntry:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       NetworkAclId: !Ref  PublicNetworkAcl
-      RuleNumber: 102
+      RuleNumber: 101
       Protocol: 6
       RuleAction: allow
       Egress: false
@@ -177,19 +159,6 @@ Resources:
       PortRange:
         From: 22
         To: 22
-
-  InboundEmphemeralPublicNetworkAclEntry:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref PublicNetworkAcl
-      RuleNumber: 103
-      Protocol: 6
-      RuleAction: allow
-      Egress: false
-      CidrBlock: 0.0.0.0/0
-      PortRange:
-        From: 1024
-        To: 65535
 
   OutboundPublicNetworkAclEntry:
     Type: AWS::EC2::NetworkAclEntry
@@ -210,7 +179,7 @@ Resources:
       SubnetId: !Ref pubnet
       NetworkAclId: !Ref PublicNetworkAcl
 
-  priSubnet:
+  priSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref UdaVPC
@@ -224,7 +193,21 @@ Resources:
         - Key: Network
           Value: Private
 
-  PriTable:
+  priSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref UdaVPC
+      CidrBlock: !FindInMap
+        - SubnetConfig
+        - Private
+        - CIDR2
+      Tags:
+        - Key: Application
+          Value: !Ref AWS::StackId
+        - Key: Network
+          Value: Private
+
+  priTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref UdaVPC
@@ -234,18 +217,24 @@ Resources:
         - Key: Network
           Value: Private
 
-  PrivateSubnetRouteTableAssociation:
+  PrivateSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref priSubnet
-      RouteTableId: !Ref PriTable
+      SubnetId: !Ref priSubnet1
+      RouteTableId: !Ref priTable
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref priSubnet2
+      RouteTableId: !Ref priTable
 
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref PriTable
+      RouteTableId: !Ref priTable
       DestinationCidrBlock: 0.0.0.0/0
-      InstanceId: !Ref NATGate
+      NatGatewayId: !Ref NATGate
 
   PrivateNetworkAcl:
     Type: AWS::EC2::NetworkAcl
@@ -283,10 +272,16 @@ Resources:
         From: 0
         To: 65535
 
-  PrivateSubnetNetworkAclAssociation:
+  PrivateSubnet1NetworkAclAssociation:
     Type: AWS::EC2::SubnetNetworkAclAssociation
     Properties:
-      SubnetId: !Ref priSubnet
+      SubnetId: !Ref priSubnet1
+      NetworkAclId: !Ref PrivateNetworkAcl
+
+  PrivateSubnet2NetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref priSubnet2
       NetworkAclId: !Ref PrivateNetworkAcl
 
   NATIPAddress:
@@ -294,7 +289,6 @@ Resources:
     DependsOn: gateToNet
     Properties:
       Domain: vpc
-      InstanceId: !Ref NATGate
   
   NATGate:
     Type: AWS::EC2::NatGateway
@@ -318,15 +312,8 @@ Resources:
       InstanceType: !Ref BastionInstanceType
       KeyName: !Ref KeyName
       SubnetId: !Ref pubnet
-      ImageId: !FindInMap
-        - AWSRegionArch2AMI
-        - !Ref 'AWS::Region'
-        - Fn::FindInMap:
-            - AWSInstanceType2Arch
-            - !Ref 'BastionInstanceType'
-            - Arch
-      SecurityGroupIds:
-        - Ref: BastionSecurityGroup
+      ImageId: ami-074f9ee1243ba4362
+      SecurityGroupIds: !Ref BastionSecurityGroup
 
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -379,26 +366,14 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
-  FrontendFleet:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      AvailabilityZones:
-        - Fn::GetAtt:
-            - priSubnet
-            - AvailabilityZone
-      VPCZoneIdentifier:
-        - Ref: priSubnet
-      LaunchConfigurationName: !Ref  FrontendServerLaunchConfig
-      MinSize: "1"
-      MaxSize: "2"
-      DesiredCapacity: !Ref  FrontendSize
-      LoadBalancerNames:
-        - Ref: PublicElasticLoadBalancer
-      Tags:
-        - Key: Network
-          Value: Public
-          PropagateAtLaunch: true
-  FrontendServerLaunchConfig:
+  ProfileWithRolesForOurApp:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - UdacityS3ReadOnlyEC2
+
+
+  LaunchServers:
     Type: AWS::AutoScaling::LaunchConfiguration
     Metadata:
       Comment1: Configure the FrontendServer to forward /backend requests to the
@@ -456,20 +431,17 @@ Resources:
                 ensureRunning: "true"
                 files:
                   - /etc/httpd/conf.d/maptobackend.conf
-                  - /var/www/html/index.html
-    Properties:
-      ImageId:
-        Fn::FindInMap:
-          - AWSRegionArch2AMI
-          - Ref: AWS::Region
-          - Fn::FindInMap:
-              - AWSInstanceType2Arch
-              - Ref: FrontendInstanceType
-              - Arch
-      SecurityGroups:
-        - Ref: FrontendSecurityGroup
-      InstanceType: !Ref  FrontendInstanceType
+                  - /var/www/html/index.html 
+    Properties: 
+      AssociatePublicIpAddress: false
+      EbsOptimized: false
+      IamInstanceProfile: !Ref ProfileWithRolesForOurApp
+      ImageId: ami-074f9ee1243ba4362    
+      InstanceMonitoring: false
+      InstanceType: !Ref  servInstanceType
       KeyName: !Ref  KeyName
+      SecurityGroups: 
+        - Ref: servSecurityGroup
       UserData:
         Fn::Base64:
           Fn::Join:
@@ -477,12 +449,16 @@ Resources:
             - - |
                 #!/bin/bash -v
               - |
-                yum update -y aws-cfn-bootstrap
-              - |
+                apt-get update -y
+                apt-get install apache2 -y
+                systemctl start apache2.service
+                cd /var/www/html
+                echo "Udacity Demo Web Server Up and Running!" > index.html
+
                 # Install Apache and configure as a reverse Frontend
               - "/opt/aws/bin/cfn-init --stack "
               - Ref: AWS::StackId
-              - " --resource FrontendServerLaunchConfig -u
+              - " --resource LaunchServers -u
                 https://cloudformation.cn-north-1.amazonaws.com.cn"
               - "    --region "
               - Ref: AWS::Region
@@ -490,14 +466,34 @@ Resources:
               - |
                 # Signal completion
               - /opt/aws/bin/cfn-signal -e $? -r "Frontend setup done" '
-              - Ref: FrontendWaitHandle
+              - Ref: servWaitHandle
               - |
                 '
-  FrontendSecurityGroup:
+ 
+
+  serv1Fleet:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones: 
+        - us-east-1a
+        - us-east-1b
+      VPCZoneIdentifier:
+        - Ref: priSubnet1
+        - Ref: priSubnet2
+      LaunchConfigurationName: !Ref  LaunchServers
+      MinSize: "1"
+      MaxSize: "2"
+      DesiredCapacity: !Ref  servSize
+      LoadBalancerNames: !Ref PublicElasticLoadBalancer
+      Tags:
+        - Key: Network
+          Value: Private
+          PropagateAtLaunch: true
+ 
+  servSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow access from load balancer and bastion as well as
-        outbound HTTP and HTTPS traffic
+      GroupDescription: Allow access from load balancer and bastion
       VpcId: !Ref UdaVPC
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -510,176 +506,40 @@ Resources:
           SourceSecurityGroupId: !Ref BastionSecurityGroup
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
+          FromPort: -1
+          ToPort: -1
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
-  FrontendWaitHandle:
-    Type: AWS::CloudFormation::WaitConditionHandle
-  FrontendWaitCondition:
-    Type: AWS::CloudFormation::WaitCondition
-    DependsOn: FrontendFleet
-    Properties:
-      Handle: !Ref  FrontendWaitHandle
-      Timeout: 3600
-      Count: !Ref  FrontendSize
-  PrivateElasticLoadBalancer:
-    Type: AWS::ElasticLoadBalancing::LoadBalancer
-    Properties:
-      SecurityGroups:
-        - Ref: PrivateLoadBalancerSecurityGroup
-      Subnets:
-        - Ref: priSubnet
-      Listeners:
-        - LoadBalancerPort: 80
-          InstancePort: 80
-          Protocol: HTTP
-      Scheme: internal
-      HealthCheck:
-        Target: HTTP:80/
-        HealthyThreshold: 3
-        UnhealthyThreshold: 5
-        Interval: 90
-        Timeout: 60
-  PrivateLoadBalancerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Private ELB Security Group with HTTP access on port 80 from
-        the Frontend Fleet only
-      VpcId: !Ref UdaVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          SourceSecurityGroupId: !Ref FrontendSecurityGroup
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-  BackendFleet:
+
+  serv2Fleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones:
-        - Fn::GetAtt:
-            - priSubnet
-            - AvailabilityZone
+      AvailabilityZones: 
+        - us-east-1a
+        - us-east-1b
       VPCZoneIdentifier:
-        - Ref: priSubnet
-      LaunchConfigurationName: !Ref  BackendLaunchConfig
+        - Ref: priSubnet1
+        - Ref: priSubnet2
+      LaunchConfigurationName: !Ref  Launchservers
       MinSize: "1"
       MaxSize: "2"
-      DesiredCapacity: !Ref  BackendSize
+      DesiredCapacity: !Ref  servSize
       LoadBalancerNames:
-        - Ref: PrivateElasticLoadBalancer
+        - Ref: PublicElasticLoadBalancer
       Tags:
         - Key: Network
           Value: Private
           PropagateAtLaunch: true
 
-  BackendLaunchConfig:
-    Type: AWS::AutoScaling::LaunchConfiguration
-    Metadata:
-      Comment1: Configure the Backend server to respond to requests
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              httpd: []
-          files:
-            /var/www/html/index.html:
-              content:
-                Fn::Join:
-                  - "\n"
-                  - - <img
-                      src="https://s3.amazonaws.com/cloudformation-examples/cloudformation_graphic.png"
-                      alt="AWS CloudFormation Logo"/>
-                    - <h1>Congratulations, this request was served from the
-                      backend fleet</h1>
-              mode: "000644"
-              owner: root
-              group: root
-          services:
-            sysvinit:
-              httpd:
-                enabled: "true"
-                ensureRunning: "true"
-                files:
-                  - /var/www/html/index.html
-    Properties:
-      ImageId:
-        Fn::FindInMap:
-          - AWSRegionArch2AMI
-          - Ref: AWS::Region
-          - Fn::FindInMap:
-              - AWSInstanceType2Arch
-              - Ref: BackendInstanceType
-              - Arch
-      SecurityGroups:
-        - Ref: BackendSecurityGroup
-      InstanceType: !Ref  BackendInstanceType
-      KeyName: !Ref  KeyName
-      UserData:
-        Fn::Base64:
-          Fn::Join:
-            - ""
-            - - |
-                #!/bin/bash -v
-              - |
-                yum update -y aws-cfn-bootstrap
-              - |
-                # Install Apache
-              - "/opt/aws/bin/cfn-init --stack "
-              - Ref: AWS::StackId
-              - " --resource BackendLaunchConfig -u
-                https://cloudformation.cn-north-1.amazonaws.com.cn"
-              - "    --region "
-              - Ref: AWS::Region
-              - "\n"
-              - |
-                # Signal completion
-              - /opt/aws/bin/cfn-signal -e $? -r "Backend setup done" '
-              - Ref: BackendWaitHandle
-              - |
-                '
-  BackendSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow access from private load balancer and bastion as well as
-        outbound HTTP and HTTPS traffic
-      VpcId: !Ref UdaVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: "80"
-          ToPort: "80"
-          SourceSecurityGroupId: !Ref PrivateLoadBalancerSecurityGroup
-        - IpProtocol: tcp
-          FromPort: "22"
-          ToPort: "22"
-          SourceSecurityGroupId: !Ref BastionSecurityGroup
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: "80"
-          ToPort: "80"
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: "443"
-          ToPort: "443"
-          CidrIp: 0.0.0.0/0
-
-  BackendWaitHandle:
+  servWaitHandle:
     Type: AWS::CloudFormation::WaitConditionHandle
 
-  BackendWaitCondition:
+  servWaitCondition:
     Type: AWS::CloudFormation::WaitCondition
-    DependsOn: BackendFleet
+    DependsOn: serv2Fleet
     Properties:
-      Handle: !Ref  BackendWaitHandle
-      Timeout: "300"
-      Count: !Ref  BackendSize
+      Handle: !Ref  servWaitHandle
+      Timeout: 300
+      Count: !Ref  servSize
 
 Outputs:
   WebSite:
