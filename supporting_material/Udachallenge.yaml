@@ -6,9 +6,19 @@ Description: "Launch Configuration
   Ubuntu 18
   12GB of disk space."
 
-#ami-074f9ee1243ba4362-ubuntu
 
 Parameters:
+
+  prinets:
+    Type: CommaDelimitedList
+    Description: The list of private subnets in your Virtual Private Cloud (VPC)
+    Default: priSubnet1, priSubnet2
+
+  Azones:
+    Type: CommaDelimitedList
+    Description: The list of private subnets in your Virtual Private Cloud (VPC)
+    Default: us-east-1a, us-east-1b
+
   KeyName:
     Description: udakey
     Type: String
@@ -39,7 +49,6 @@ Parameters:
     Description: Number of EC2 instances to launch for the Frontend server
     Type: Number
     Default: "2"
-
 
   BastionInstanceType:
     Description: Bastion Host EC2 instance type
@@ -364,14 +373,13 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: 0.0.0.0/0
+          CidrIp: !Ref UdaVPC
 
   ProfileWithRolesForOurApp:
     Type: AWS::IAM::InstanceProfile
     Properties: 
       Roles:
         - UdacityS3ReadOnlyEC2
-
 
   LaunchServers:
     Type: AWS::AutoScaling::LaunchConfiguration
@@ -474,12 +482,8 @@ Resources:
   serv1Fleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones: 
-        - us-east-1a
-        - us-east-1b
-      VPCZoneIdentifier:
-        - Ref: priSubnet1
-        - Ref: priSubnet2
+      AvailabilityZones: !Ref Azones
+      VPCZoneIdentifier: !Ref prinets
       LaunchConfigurationName: !Ref  LaunchServers
       MinSize: "1"
       MaxSize: "2"
@@ -513,12 +517,8 @@ Resources:
   serv2Fleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones: 
-        - us-east-1a
-        - us-east-1b
-      VPCZoneIdentifier:
-        - Ref: priSubnet1
-        - Ref: priSubnet2
+      AvailabilityZones: !Ref Azones
+      VPCZoneIdentifier: !Ref prinets
       LaunchConfigurationName: !Ref  Launchservers
       MinSize: "1"
       MaxSize: "2"
