@@ -486,7 +486,7 @@ Resources:
     Properties:
       AvailabilityZones: !Ref Azones
       VPCZoneIdentifier: !Ref prinets
-      LaunchConfigurationName: !Ref  Launchservers
+      LaunchConfigurationName: !Ref  LaunchServers
       MinSize: "1"
       MaxSize: "2"
       DesiredCapacity: !Ref  servSize
