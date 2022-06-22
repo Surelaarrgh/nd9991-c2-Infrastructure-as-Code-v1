@@ -15,6 +15,7 @@ Parameters:
     Description: The list of private subnets in your Virtual Private Cloud (VPC)
     Default: us-east-1a, us-east-1b
 
+
   KeyName:
     Description: udakey
     Type: String
@@ -23,6 +24,7 @@ Parameters:
     AllowedPattern: "[-_ a-zA-Z0-9]*"
     ConstraintDescription: can contain only alphanumeric characters, spaces, dashes and underscores.
     
+
   SSHLocation:
     Description: Lockdown SSH access to the bastion host (default can be accessed
       from anywhere)
@@ -415,7 +417,6 @@ Resources:
       ImageId: ami-074f9ee1243ba4362    
       InstanceMonitoring: false
       InstanceType: !Ref  servInstanceType
-      KeyName: !Ref  KeyName
       SecurityGroups: 
         - Ref: servSecurityGroup
       UserData:
@@ -429,7 +430,7 @@ Resources:
                 apt-get install apache2 -y
                 systemctl start apache2.service
                 cd /var/www/html
-                echo "Udacity Demo Web Server Up and Running!" > index.html
+                echo "Udacity Server Up and Running!" > index.html
 
                 # Install Apache and configure as a reverse Frontend
               - "/opt/aws/bin/cfn-init --stack "
@@ -437,7 +438,7 @@ Resources:
               - " --resource LaunchServers -u
                 https://cloudformation.cn-north-1.amazonaws.com.cn"
               - "    --region "
-              - Ref: AWS::Region
+              - "us-east-1"
               - "\n"
               - |
                 # Signal completion
