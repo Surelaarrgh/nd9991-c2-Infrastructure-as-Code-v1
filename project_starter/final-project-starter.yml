@@ -295,11 +295,12 @@ Resources:
   NATGate:
     Type: AWS::EC2::NatGateway
     Properties: 
-      AllocationId: !Ref NATIPAddress
+      AllocationId:
+        Fn::GetAtt:
+        - NATIPAddress
+        - AllocationId
       ConnectivityType: public
       SubnetId: !Ref pubnet
-      Tags: 
-          - Tag
 
   #BastionIPAddress:
   #  Type: AWS::EC2::EIP
@@ -446,13 +447,13 @@ Resources:
   serv1Fleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones: !Ref Azones
-      VPCZoneIdentifier: !Ref prinets
+      AvailabilityZones: [us-east-1a]
+      VPCZoneIdentifier: [!Ref priSubnet1]
       LaunchConfigurationName: !Ref  LaunchServers
       MinSize: "1"
       MaxSize: "2"
       DesiredCapacity: !Ref  servSize
-      LoadBalancerNames: !Ref PublicElasticLoadBalancer
+      LoadBalancerNames: [!Ref PublicElasticLoadBalancer]
       Tags:
         - Key: Network
           Value: Private
@@ -474,15 +475,15 @@ Resources:
 #          SourceSecurityGroupId: !Ref BastionSecurityGroup
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: 1
-          ToPort: 65536
+          FromPort: 0
+          ToPort: 65535
           CidrIp: 0.0.0.0/0
 
   serv2Fleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones: !Ref Azones
-      VPCZoneIdentifier: !Ref prinets
+      AvailabilityZones: [us-east-1b]
+      VPCZoneIdentifier: [!Ref priSubnet2]
       LaunchConfigurationName: !Ref  LaunchServers
       MinSize: "1"
       MaxSize: "2"
