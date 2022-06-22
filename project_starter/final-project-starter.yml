@@ -15,16 +15,6 @@ Parameters:
     Description: The list of private subnets in your Virtual Private Cloud (VPC)
     Default: us-east-1a, us-east-1b
 
-
-  KeyName:
-    Description: udakey
-    Type: AWS::EC2::KeyPair::KeyName
-    MinLength: "1"
-    MaxLength: "64"
-    AllowedPattern: "[-_ a-zA-Z0-9]*"
-    ConstraintDescription: can contain only alphanumeric characters, spaces, dashes and underscores.
-    
-
   SSHLocation:
     Description: Lockdown SSH access to the bastion host (default can be accessed
       from anywhere)
@@ -316,11 +306,16 @@ Resources:
       Domain: vpc
       InstanceId: !Ref BastionHost
       
+  BastionKey:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: MyKeyPair
+
   BastionHost:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref BastionInstanceType
-      KeyName: udakey
+      KeyName: !Ref BastionKey
       SubnetId: !Ref pubnet
       ImageId: ami-074f9ee1243ba4362
       SecurityGroupIds: !Ref BastionSecurityGroup
