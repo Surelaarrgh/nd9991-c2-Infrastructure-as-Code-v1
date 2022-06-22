@@ -183,7 +183,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1a
-      AvailabilityZoneId: use1-az1
+      AvailabilityZoneId: use1-az4
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -199,7 +199,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1b
-      AvailabilityZoneId: use1-az1
+      AvailabilityZoneId: use1-az6
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
