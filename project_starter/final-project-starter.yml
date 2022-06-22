@@ -15,15 +15,15 @@ Parameters:
     Description: The list of private subnets in your Virtual Private Cloud (VPC)
     Default: us-east-1a, us-east-1b
 
-  SSHLocation:
-    Description: Lockdown SSH access to the bastion host (default can be accessed
-      from anywhere)
-    Type: String
-    MinLength: "9"
-    MaxLength: "18"
-    Default: 0.0.0.0/0
-    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
-    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x.
+# SSHLocation:
+#    Description: Lockdown SSH access to the bastion host (default can be accessed
+#      from anywhere)
+#    Type: String
+#    MinLength: "9"
+#    MaxLength: "18"
+#    Default: 0.0.0.0/0
+#    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+#    ConstraintDescription: must be a valid CIDR range of the form x.x.x.x/x.
 
   servInstanceType:
     Description:  Server EC2 instance type
@@ -38,13 +38,13 @@ Parameters:
     Type: Number
     Default: "2"
 
-  BastionInstanceType:
-    Description: Bastion Host EC2 instance type
-    Type: String
-    Default: t2.medium
-    AllowedValues:
-      - t2.medium
-    ConstraintDescription: must be a valid EC2 instance type.
+  # BastionInstanceType:
+  #  Description: Bastion Host EC2 instance type
+  #  Type: String
+  #  Default: t2.medium
+  #  AllowedValues:
+  #    - t2.medium
+  #  ConstraintDescription: must be a valid EC2 instance type.
 
  
 Mappings:
@@ -147,18 +147,18 @@ Resources:
         From: 80
         To: 80
 
-  InboundSSHPublicNetworkAclEntry:
-    Type: AWS::EC2::NetworkAclEntry
-    Properties:
-      NetworkAclId: !Ref  PublicNetworkAcl
-      RuleNumber: 101
-      Protocol: 6
-      RuleAction: allow
-      Egress: false
-      CidrBlock: !Ref SSHLocation
-      PortRange:
-        From: 22
-        To: 22
+#  InboundSSHPublicNetworkAclEntry:
+#    Type: AWS::EC2::NetworkAclEntry
+#    Properties:
+#      NetworkAclId: !Ref  PublicNetworkAcl
+#      RuleNumber: 101
+#      Protocol: 6
+#      RuleAction: allow
+#      Egress: false
+#      CidrBlock: !Ref SSHLocation
+#      PortRange:
+#        From: 22
+#        To: 22
 
   OutboundPublicNetworkAclEntry:
     Type: AWS::EC2::NetworkAclEntry
@@ -183,7 +183,6 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1a
-      AvailabilityZoneId: use1-az4
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -199,7 +198,6 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1b
-      AvailabilityZoneId: use1-az6
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -303,50 +301,50 @@ Resources:
       Tags: 
           - Tag
 
-  BastionIPAddress:
-    Type: AWS::EC2::EIP
-    DependsOn: gateToNet
-    Properties:
-      Domain: vpc
-      InstanceId: !Ref BastionHost
+  #BastionIPAddress:
+  #  Type: AWS::EC2::EIP
+  #  DependsOn: gateToNet
+  #  Properties:
+  #    Domain: vpc
+  #    InstanceId: !Ref BastionHost
       
-  BastionKey:
-    Type: 'AWS::EC2::KeyPair'
-    Properties:
-      KeyName: MyKeyPair
+  #BastionKey:
+  #  Type: 'AWS::EC2::KeyPair'
+  #  Properties:
+  #    KeyName: MyKeyPair
 
-  BastionHost:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: !Ref BastionInstanceType
-      KeyName: !Ref BastionKey
-      SubnetId: !Ref pubnet
-      ImageId: ami-01c7c5bf31cabfb04
-      SecurityGroupIds: [!Ref BastionSecurityGroup]
+  #BastionHost:
+  #  Type: AWS::EC2::Instance
+  #  Properties:
+  #    InstanceType: !Ref BastionInstanceType
+  #    KeyName: !Ref BastionKey
+  #    SubnetId: !Ref pubnet
+  #    ImageId: ami-0e081ed4ce61c1fb2
+  #    SecurityGroupIds: [!Ref BastionSecurityGroup]
 
-  BastionSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable access to the Bastion host
-      VpcId: !Ref UdaVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref SSHLocation
-      SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !FindInMap
-            - SubnetConfig
-            - Private
-            - CIDR
+  #BastionSecurityGroup:
+  #  Type: AWS::EC2::SecurityGroup
+  #  Properties:
+  #    GroupDescription: Enable access to the Bastion host
+  #    VpcId: !Ref UdaVPC
+  #    SecurityGroupIngress:
+  #      - IpProtocol: tcp
+  #        FromPort: 22
+  #        ToPort: 22
+  #        CidrIp: !Ref SSHLocation
+  #   SecurityGroupEgress:
+  #      - IpProtocol: tcp
+  #        FromPort: 22
+  #        ToPort: 22
+  #        CidrIp: !FindInMap
+  #          - SubnetConfig
+  #          - Private
+  #          - CIDR
   
   PublicElasticLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Subnets: [!Ref pubnet]
+      Subnets: [!Ref priSubnet1 ,!Ref priSubnet2]
       SecurityGroups: [!Ref PublicLoadBalancerSecurityGroup]
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -413,7 +411,7 @@ Resources:
           VolumeSize: 20
       EbsOptimized: false
       IamInstanceProfile: !Ref ProfileWithRolesForOurApp
-      ImageId: ami-01c7c5bf31cabfb04    
+      ImageId: ami-0e081ed4ce61c1fb2    
       InstanceMonitoring: false
       InstanceType: !Ref  servInstanceType
       SecurityGroups: [!Ref servSecurityGroup]
@@ -470,14 +468,14 @@ Resources:
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: !Ref PublicLoadBalancerSecurityGroup
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          SourceSecurityGroupId: !Ref BastionSecurityGroup
+#        - IpProtocol: tcp
+#          FromPort: 22
+#          ToPort: 22
+#          SourceSecurityGroupId: !Ref BastionSecurityGroup
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: -1
-          ToPort: -1
+          FromPort: 1
+          ToPort: 65536
           CidrIp: 0.0.0.0/0
 
   serv2Fleet:
@@ -522,9 +520,9 @@ Outputs:
           - Fn::GetAtt:
               - PublicElasticLoadBalancer
               - DNSName
-  Bastion:
-    Description: IP Address of the Bastion host
-    Value: !Ref BastionIPAddress
+#  Bastion:
+#    Description: IP Address of the Bastion host
+#    Value: !Ref BastionIPAddress
 
 
 # Sample UserData
