@@ -54,7 +54,7 @@ Mappings:
       CIDR: 12.0.0.0/24
     Private:
       CIDR: 12.0.1.0/24
-      CIDR2: 12.0.1.0/24
+      CIDR2: 12.0.2.0/24
 
 
 Resources:
@@ -182,6 +182,8 @@ Resources:
   priSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
+      AvailabilityZone: us-east-1a
+      AvailabilityZoneId: use1-az1
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -196,6 +198,8 @@ Resources:
   priSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
+      AvailabilityZone: us-east-1b
+      AvailabilityZoneId: use1-az1
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -317,8 +321,8 @@ Resources:
       InstanceType: !Ref BastionInstanceType
       KeyName: !Ref BastionKey
       SubnetId: !Ref pubnet
-      ImageId: ami-074f9ee1243ba4362
-      SecurityGroupIds: !Ref BastionSecurityGroup
+      ImageId: ami-01c7c5bf31cabfb04
+      SecurityGroupIds: [!Ref BastionSecurityGroup]
 
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -342,8 +346,8 @@ Resources:
   PublicElasticLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Subnets: !Ref pubnet
-      SecurityGroups: !Ref PublicLoadBalancerSecurityGroup
+      Subnets: [!Ref pubnet]
+      SecurityGroups: [!Ref PublicLoadBalancerSecurityGroup]
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -391,7 +395,7 @@ Resources:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
-          CidrIp: !Ref UdaVPC
+          CidrIp: 12.0.0.0/16
 
   ProfileWithRolesForOurApp:
     Type: AWS::IAM::InstanceProfile
@@ -406,14 +410,13 @@ Resources:
       BlockDeviceMappings:
       - DeviceName: "/dev/sdk"
         Ebs:
-          VolumeSize: '10'      
+          VolumeSize: 20
       EbsOptimized: false
       IamInstanceProfile: !Ref ProfileWithRolesForOurApp
-      ImageId: ami-074f9ee1243ba4362    
+      ImageId: ami-01c7c5bf31cabfb04    
       InstanceMonitoring: false
       InstanceType: !Ref  servInstanceType
-      SecurityGroups: 
-        - Ref: servSecurityGroup
+      SecurityGroups: [!Ref servSecurityGroup]
       UserData:
         Fn::Base64:
           Fn::Join:
