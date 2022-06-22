@@ -18,7 +18,7 @@ Parameters:
 
   KeyName:
     Description: udakey
-    Type: String
+    Type: AWS::EC2::KeyPair::KeyName
     MinLength: "1"
     MaxLength: "64"
     AllowedPattern: "[-_ a-zA-Z0-9]*"
@@ -320,7 +320,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref BastionInstanceType
-      KeyName: !Ref KeyName
+      KeyName: udakey
       SubnetId: !Ref pubnet
       ImageId: ami-074f9ee1243ba4362
       SecurityGroupIds: !Ref BastionSecurityGroup
