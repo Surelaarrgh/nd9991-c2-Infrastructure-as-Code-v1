@@ -28,33 +28,33 @@ Parameters:
   servInstanceType:
     Description:  Server EC2 instance type
     Type: String
-    Default: t2.medium
+    Default: t3.medium
     AllowedValues:
-      - t2.medium
-    ConstraintDescription: must be a t2.medium.
+      - t3.medium
+    ConstraintDescription: must be a t3.medium.
   
   servSize:
     Description: Number of EC2 instances to launch for the Frontend server
     Type: Number
     Default: "2"
 
-  # BastionInstanceType:
-  #  Description: Bastion Host EC2 instance type
-  #  Type: String
-  #  Default: t2.medium
-  #  AllowedValues:
-  #    - t2.medium
-  #  ConstraintDescription: must be a valid EC2 instance type.
+  BastionInstanceType:
+    Description: Bastion Host EC2 instance type
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t3.medium
+    ConstraintDescription: must be a valid EC2 instance type.
 
  
 Mappings:
   SubnetConfig:
     VPC: !Ref UdaVPC
     Public:
-      CIDR: 12.0.0.0/24
+      CIDR: 10.0.0.0/24
     Private:
-      CIDR: 12.0.1.0/24
-      CIDR2: 12.0.2.0/24
+      CIDR: 10.0.1.0/24
+      CIDR2: 10.0.2.0/24
 
 
 Resources:
@@ -64,7 +64,7 @@ Resources:
   UdaVPC:
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: 12.0.0.0/16
+      CidrBlock: 10.0.0.0/16
       Tags:
         - Key: Application
           Value: !Ref AWS::StackId
@@ -75,6 +75,8 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref UdaVPC
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: us-east-1c
       CidrBlock: !FindInMap
         - SubnetConfig
         - Public
@@ -117,6 +119,7 @@ Resources:
       RouteTableId: !Ref pubTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref iWay
+#      NatGatewayId: ! NATGate
 
   PublicSubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -147,24 +150,24 @@ Resources:
         From: 80
         To: 80
 
-#  InboundSSHPublicNetworkAclEntry:
-#    Type: AWS::EC2::NetworkAclEntry
-#    Properties:
-#      NetworkAclId: !Ref  PublicNetworkAcl
-#      RuleNumber: 101
-#      Protocol: 6
-#      RuleAction: allow
-#      Egress: false
-#      CidrBlock: !Ref SSHLocation
-#      PortRange:
-#        From: 22
-#        To: 22
+  InboundSSHPublicNetworkAclEntry:
+    Type: AWS::EC2::NetworkAclEntry
+    Properties:
+      NetworkAclId: !Ref  PublicNetworkAcl
+      RuleNumber: 101
+      Protocol: 6
+      RuleAction: allow
+      Egress: false
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: 22
+        To: 22
 
   OutboundPublicNetworkAclEntry:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       NetworkAclId: !Ref PublicNetworkAcl
-      RuleNumber: 100
+      RuleNumber: 102
       Protocol: 6
       RuleAction: allow
       Egress: true
@@ -183,6 +186,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: false
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -198,6 +202,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: false
       VpcId: !Ref UdaVPC
       CidrBlock: !FindInMap
         - SubnetConfig
@@ -209,7 +214,7 @@ Resources:
         - Key: Network
           Value: Private
 
-  priTable:
+  priTable1:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref UdaVPC
@@ -223,19 +228,20 @@ Resources:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref priSubnet1
-      RouteTableId: !Ref priTable
+      RouteTableId: !Ref priTable1
 
   PrivateSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref priSubnet2
-      RouteTableId: !Ref priTable
+      RouteTableId: !Ref priTable1
 
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
-      RouteTableId: !Ref priTable
+      RouteTableId: !Ref priTable1
       DestinationCidrBlock: 0.0.0.0/0
+#      GatewayId: !Ref iWay
       NatGatewayId: !Ref NATGate
 
   PrivateNetworkAcl:
@@ -252,7 +258,7 @@ Resources:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       NetworkAclId: !Ref PrivateNetworkAcl
-      RuleNumber: 100
+      RuleNumber: 103
       Protocol: 6
       RuleAction: allow
       Egress: false
@@ -265,7 +271,7 @@ Resources:
     Type: AWS::EC2::NetworkAclEntry
     Properties:
       NetworkAclId: !Ref PrivateNetworkAcl
-      RuleNumber: 100
+      RuleNumber: 104
       Protocol: 6
       RuleAction: allow
       Egress: true
@@ -299,48 +305,67 @@ Resources:
         Fn::GetAtt:
         - NATIPAddress
         - AllocationId
-      ConnectivityType: public
+#      ConnectivityType: public
       SubnetId: !Ref pubnet
 
-  #BastionIPAddress:
-  #  Type: AWS::EC2::EIP
-  #  DependsOn: gateToNet
-  #  Properties:
-  #    Domain: vpc
-  #    InstanceId: !Ref BastionHost
+  BastionIPAddress:
+    Type: AWS::EC2::EIP
+    DependsOn: gateToNet
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref BastionHost
       
-  #BastionKey:
-  #  Type: 'AWS::EC2::KeyPair'
-  #  Properties:
-  #    KeyName: MyKeyPair
+  BastionKey:
+    Type: 'AWS::EC2::KeyPair'
+    Properties:
+      KeyName: udackey
+#      PublicKeyMAterial: 
+#        Fn::Base64:
+#          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIM0qpUnKQEe+O90Q49UqYH7W5gqqAB08O9cfLpR9Ho5 eddsa-key-20220629
 
-  #BastionHost:
-  #  Type: AWS::EC2::Instance
-  #  Properties:
-  #    InstanceType: !Ref BastionInstanceType
-  #    KeyName: !Ref BastionKey
-  #    SubnetId: !Ref pubnet
-  #    ImageId: ami-0e081ed4ce61c1fb2
-  #    SecurityGroupIds: [!Ref BastionSecurityGroup]
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref BastionInstanceType
+      KeyName: !Ref BastionKey
+      SubnetId: !Ref pubnet
+      ImageId: ami-0729e439b6769d6ab
+      SecurityGroupIds: [!Ref BastionSecurityGroup]
 
-  #BastionSecurityGroup:
-  #  Type: AWS::EC2::SecurityGroup
-  #  Properties:
-  #    GroupDescription: Enable access to the Bastion host
-  #    VpcId: !Ref UdaVPC
-  #    SecurityGroupIngress:
-  #      - IpProtocol: tcp
-  #        FromPort: 22
-  #        ToPort: 22
-  #        CidrIp: !Ref SSHLocation
-  #   SecurityGroupEgress:
-  #      - IpProtocol: tcp
-  #        FromPort: 22
-  #        ToPort: 22
-  #        CidrIp: !FindInMap
-  #          - SubnetConfig
-  #          - Private
-  #          - CIDR
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable access to the Bastion host
+      VpcId: !Ref UdaVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !FindInMap
+            - SubnetConfig
+            - Private
+            - CIDR
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
   
   PublicElasticLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -356,28 +381,35 @@ Resources:
       LoadBalancerArn: !Ref PublicElasticLoadBalancer
       Port: 80
       Protocol: HTTP
-  ALBListenerRule:
-      Type: AWS::ElasticLoadBalancingV2::ListenerRule
-      Properties:
-        Actions:
-        - Type: forward
-          TargetGroupArn: !Ref 'servTargetGroup'
-        Conditions:
-        - Field: path-pattern
-          Values: [/]
-        ListenerArn: !Ref 'Listener'
-        Priority: 1
+#  ALBListenerRule:
+#      Type: AWS::ElasticLoadBalancingV2::ListenerRule
+#      Properties:
+#        Actions:
+#        - Type: forward
+#          TargetGroupArn: !Ref 'servTargetGroup'
+#        Conditions:
+#        - Field: path-pattern
+#          Values: [/]
+#        ListenerArn: !Ref 'Listener'
+#        Priority: 1
   servTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      HealthCheckIntervalSeconds: 90
-      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+#      HealthCheckPath: /
       HealthCheckProtocol: HTTP
-      HealthCheckTimeoutSeconds: 60
+      HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 3
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 5
+      VpcId: !Ref UdaVPC
+
+  NoIngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "no-ingress-sg"
+      GroupDescription: "Security group with no ingress rule"
       VpcId: !Ref UdaVPC
 
   PublicLoadBalancerSecurityGroup:
@@ -392,9 +424,9 @@ Resources:
           CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 12.0.0.0/16
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
 
   ProfileWithRolesForOurApp:
     Type: AWS::IAM::InstanceProfile
@@ -412,7 +444,8 @@ Resources:
           VolumeSize: 20
       EbsOptimized: false
       IamInstanceProfile: !Ref ProfileWithRolesForOurApp
-      ImageId: ami-0e081ed4ce61c1fb2    
+      KeyName: udackey
+      ImageId: ami-0729e439b6769d6ab    
       InstanceMonitoring: false
       InstanceType: !Ref  servInstanceType
       SecurityGroups: [!Ref servSecurityGroup]
@@ -422,43 +455,34 @@ Resources:
             - ""
             - - |
                 #!/bin/bash -v
-              - |
-                apt-get update -y
-                apt-get install apache2 -y
-                systemctl start apache2.service
+                
+                sudo apt install openssh-server
+                sudo ufw allow ssh
+                sudo apt-get update -y
+                sudo apt-get install apache2 -y
+                sudo systemctl start apache2.service
                 cd /var/www/html
                 echo "Udacity Server Up and Running!" > index.html
 
-                # Install Apache and configure as a reverse Frontend
-              - "/opt/aws/bin/cfn-init --stack "
-              - Ref: AWS::StackId
-              - " --resource LaunchServers -u
-                https://cloudformation.cn-north-1.amazonaws.com.cn"
-              - "    --region "
-              - "us-east-1"
-              - "\n"
-              - |
-                # Signal completion
-              - /opt/aws/bin/cfn-signal -e $? -r "Frontend setup done" '
-              - Ref: servWaitHandle
-              - |
-                '
- 
-  serv1Fleet:
+
+  servFleet:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones: [us-east-1a]
-      VPCZoneIdentifier: [!Ref priSubnet1]
+      AvailabilityZones: [us-east-1a, us-east-1b]
+      VPCZoneIdentifier: [!Ref priSubnet1, !Ref priSubnet2]
       LaunchConfigurationName: !Ref  LaunchServers
-      MinSize: "1"
-      MaxSize: "2"
+      MinSize: "2"
+      MaxSize: "4"
       DesiredCapacity: !Ref  servSize
-      LoadBalancerNames: [!Ref PublicElasticLoadBalancer]
+      HealthCheckGracePeriod: 300
+      HealthCheckType: ELB
+      TargetGroupARNs:
+        - !Ref servTargetGroup
       Tags:
         - Key: Network
           Value: Private
           PropagateAtLaunch: true
- 
+
   servSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -469,42 +493,48 @@ Resources:
           FromPort: 80
           ToPort: 80
           SourceSecurityGroupId: !Ref PublicLoadBalancerSecurityGroup
-#        - IpProtocol: tcp
-#          FromPort: 22
-#          ToPort: 22
-#          SourceSecurityGroupId: !Ref BastionSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 0
           ToPort: 65535
           CidrIp: 0.0.0.0/0
+        - IpProtocol: icmp
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
 
-  serv2Fleet:
-    Type: AWS::AutoScaling::AutoScalingGroup
-    Properties:
-      AvailabilityZones: [us-east-1b]
-      VPCZoneIdentifier: [!Ref priSubnet2]
-      LaunchConfigurationName: !Ref  LaunchServers
-      MinSize: "1"
-      MaxSize: "2"
-      DesiredCapacity: !Ref  servSize
-      LoadBalancerNames:
-        - Ref: PublicElasticLoadBalancer
-      Tags:
-        - Key: Network
-          Value: Private
-          PropagateAtLaunch: true
+#  serv2Fleet:
+#    Type: AWS::AutoScaling::AutoScalingGroup
+#    Properties:
+#      AvailabilityZones: [us-east-1b]
+#      VPCZoneIdentifier: [!Ref priSubnet2]
+#      LaunchConfigurationName: !Ref  LaunchServers
+#      MinSize: "1"
+#      MaxSize: "2"
+#      DesiredCapacity: !Ref  servSize
+#      Tags:
+#        - Key: Network
+#          Value: Private
+#          PropagateAtLaunch: true
 
-  servWaitHandle:
-    Type: AWS::CloudFormation::WaitConditionHandle
+  #servWaitHandle:
+  #  Type: AWS::CloudFormation::WaitConditionHandle
 
-  servWaitCondition:
-    Type: AWS::CloudFormation::WaitCondition
-    DependsOn: serv2Fleet
-    Properties:
-      Handle: !Ref  servWaitHandle
-      Timeout: 300
-      Count: !Ref  servSize
+  #servWaitCondition:
+  #  Type: AWS::CloudFormation::WaitCondition
+  #  DependsOn: serv2Fleet
+  #  Properties:
+  #    Handle: !Ref  servWaitHandle
+  #    Timeout: 300
+  #    Count: !Ref  servSize
 
 
 Outputs: 
@@ -521,9 +551,20 @@ Outputs:
           - Fn::GetAtt:
               - PublicElasticLoadBalancer
               - DNSName
-#  Bastion:
-#    Description: IP Address of the Bastion host
-#    Value: !Ref BastionIPAddress
+
+  UdaVPC: 
+      Description: A reference to the created VPC
+      Value: !Ref UdaVPC
+
+#  NATIPAddress:
+#    Value: 
+#      Fn::GetAtt:
+#      - NATIPAddress
+#      - AllocationId
+
+  Bastion:
+    Description: IP Address of the Bastion host
+    Value: !Ref BastionIPAddress
 
 
 # Sample UserData
