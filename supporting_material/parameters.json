@@ -1,0 +1,10 @@
+[
+    {
+        "ParameterKey": "newlyVPC",
+        "ParameterValue": "vpc-0e32fd1fd3fadfd9d"
+      },
+      {
+        "ParameterKey": "pubnet",
+        "ParameterValue": "subnet-04c9d07be83e063d3"
+      }
+]
