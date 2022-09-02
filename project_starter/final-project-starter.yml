@@ -76,7 +76,7 @@ Resources:
     Properties:
       VpcId: !Ref UdaVPC
       MapPublicIpOnLaunch: true
-      AvailabilityZone: us-east-1c
+      AvailabilityZone: us-east-1a
       CidrBlock: !FindInMap
         - SubnetConfig
         - Public
